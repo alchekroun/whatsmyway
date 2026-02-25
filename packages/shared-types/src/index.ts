@@ -3,8 +3,6 @@ export type EventInput = {
   address: string;
   start_at: string;
   end_at: string;
-  lat: number;
-  lng: number;
   sales_rep_id: string;
   time_zone?: string;
 };
@@ -19,8 +17,6 @@ export type RecommendationRequest = {
   sales_rep_id: string;
   new_event_duration_min: number;
   new_event_address: string;
-  new_event_lat: number;
-  new_event_lng: number;
   buffer_min?: number;
 };
 

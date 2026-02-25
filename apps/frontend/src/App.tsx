@@ -32,8 +32,6 @@ export default function App() {
     address: "",
     start_at: nowLocalDateTime(),
     end_at: minutesFromNow(60),
-    lat: 40.7128,
-    lng: -74.006,
     sales_rep_id: salesRepId,
     time_zone: Intl.DateTimeFormat().resolvedOptions().timeZone
   });
@@ -44,8 +42,6 @@ export default function App() {
     sales_rep_id: salesRepId,
     new_event_duration_min: 45,
     new_event_address: "",
-    new_event_lat: 40.73061,
-    new_event_lng: -73.935242,
     buffer_min: 10
   });
 
@@ -122,6 +118,7 @@ export default function App() {
           <label>
             Title
             <input
+              required
               value={eventForm.title}
               onChange={(e) => setEventForm({ ...eventForm, title: e.target.value })}
             />
@@ -129,6 +126,7 @@ export default function App() {
           <label>
             Address
             <input
+              required
               value={eventForm.address}
               onChange={(e) => setEventForm({ ...eventForm, address: e.target.value })}
             />
@@ -150,22 +148,6 @@ export default function App() {
                 onChange={(e) => setEventForm({ ...eventForm, end_at: e.target.value })}
               />
             </label>
-            <label>
-              Latitude
-              <input
-                type="number"
-                value={eventForm.lat}
-                onChange={(e) => setEventForm({ ...eventForm, lat: Number(e.target.value) })}
-              />
-            </label>
-            <label>
-              Longitude
-              <input
-                type="number"
-                value={eventForm.lng}
-                onChange={(e) => setEventForm({ ...eventForm, lng: Number(e.target.value) })}
-              />
-            </label>
           </div>
           <button onClick={submitEvent}>Save event</button>
         </div>
@@ -175,6 +157,7 @@ export default function App() {
           <label>
             New event address
             <input
+              required
               value={recommendForm.new_event_address}
               onChange={(e) =>
                 setRecommendForm({ ...recommendForm, new_event_address: e.target.value })
@@ -186,6 +169,7 @@ export default function App() {
               Duration (min)
               <input
                 type="number"
+                min={1}
                 value={recommendForm.new_event_duration_min}
                 onChange={(e) =>
                   setRecommendForm({
@@ -199,28 +183,9 @@ export default function App() {
               Buffer (min)
               <input
                 type="number"
+                min={0}
                 value={recommendForm.buffer_min}
                 onChange={(e) => setRecommendForm({ ...recommendForm, buffer_min: Number(e.target.value) })}
-              />
-            </label>
-            <label>
-              Latitude
-              <input
-                type="number"
-                value={recommendForm.new_event_lat}
-                onChange={(e) =>
-                  setRecommendForm({ ...recommendForm, new_event_lat: Number(e.target.value) })
-                }
-              />
-            </label>
-            <label>
-              Longitude
-              <input
-                type="number"
-                value={recommendForm.new_event_lng}
-                onChange={(e) =>
-                  setRecommendForm({ ...recommendForm, new_event_lng: Number(e.target.value) })
-                }
               />
             </label>
           </div>
