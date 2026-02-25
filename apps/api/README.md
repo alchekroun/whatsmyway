@@ -24,3 +24,17 @@ python run.py
 - `GET /api/events?sales_rep_id=...&start=...&end=...`
 - `POST /api/events` (address-only input; backend geocodes)
 - `POST /api/recommendations` (address-only input; backend geocodes)
+
+## Tests
+
+```bash
+python -m pytest
+```
+
+To snapshot real routing once for the 20-address Paris recommendations dataset and reuse it in tests:
+
+```bash
+python tests/scripts/fetch_paris_routes_snapshot.py
+```
+
+This writes `tests/data/paris_routes_cache.json`, which is then consumed by `test_recommendations.py` with no per-test API calls.

@@ -1,0 +1,22 @@
+[
+  {"name": "Louvre Museum", "lat": 48.860611, "lng": 2.337644},
+  {"name": "Notre-Dame", "lat": 48.852968, "lng": 2.349902},
+  {"name": "Eiffel Tower", "lat": 48.85837, "lng": 2.294481},
+  {"name": "Arc de Triomphe", "lat": 48.873792, "lng": 2.295028},
+  {"name": "Gare du Nord", "lat": 48.880948, "lng": 2.355314},
+  {"name": "Place de la Bastille", "lat": 48.853041, "lng": 2.369139},
+  {"name": "Montparnasse Tower", "lat": 48.842208, "lng": 2.321111},
+  {"name": "Place de la République", "lat": 48.867368, "lng": 2.363091},
+  {"name": "Opéra Garnier", "lat": 48.8719, "lng": 2.3316},
+  {"name": "Luxembourg Gardens", "lat": 48.846222, "lng": 2.33716},
+  {"name": "Canal Saint-Martin", "lat": 48.8722, "lng": 2.3637},
+  {"name": "Parc Monceau", "lat": 48.879, "lng": 2.3094},
+  {"name": "La Défense Esplanade", "lat": 48.891865, "lng": 2.238443},
+  {"name": "Bercy Village", "lat": 48.8324, "lng": 2.3861},
+  {"name": "Parc des Buttes-Chaumont", "lat": 48.8809, "lng": 2.3819},
+  {"name": "Place d'Italie", "lat": 48.8313, "lng": 2.3555},
+  {"name": "Trocadéro", "lat": 48.8629, "lng": 2.2870},
+  {"name": "Père Lachaise", "lat": 48.8614, "lng": 2.3933},
+  {"name": "Batignolles", "lat": 48.8867, "lng": 2.3186},
+  {"name": "Sorbonne", "lat": 48.8493, "lng": 2.3430}
+]
