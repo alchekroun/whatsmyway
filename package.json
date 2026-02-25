@@ -1,0 +1,14 @@
+{
+  "name": "whatsmyway",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": [
+    "apps/frontend",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:frontend": "npm --workspace @whatsmyway/frontend run dev",
+    "build:frontend": "npm --workspace @whatsmyway/frontend run build",
+    "test:frontend": "npm --workspace @whatsmyway/frontend run test"
+  }
+}
