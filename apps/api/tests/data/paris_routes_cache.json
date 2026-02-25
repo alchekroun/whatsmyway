@@ -1,0 +1,7 @@
+{
+  "provider": "osrm",
+  "profile": "driving",
+  "captured_at": null,
+  "source": "run apps/api/tests/scripts/fetch_paris_routes_snapshot.py once in a network-enabled environment",
+  "durations_min": null
+}
