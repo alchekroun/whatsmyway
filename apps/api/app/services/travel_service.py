@@ -1,10 +1,16 @@
 import math
+from typing import TypedDict
 
-AVERAGE_CITY_SPEED_KMH = 35.0
-TRAFFIC_MULTIPLIER = 1.2
+AVERAGE_CITY_SPEED_KMH: float = 35.0
+TRAFFIC_MULTIPLIER: float = 1.2
 
 
-def _haversine_km(origin_lat, origin_lng, dest_lat, dest_lng):
+class Location(TypedDict):
+    lat: float
+    lng: float
+
+
+def _haversine_km(origin_lat: float, origin_lng: float, dest_lat: float, dest_lng: float) -> float:
     radius = 6371.0
     d_lat = math.radians(dest_lat - origin_lat)
     d_lng = math.radians(dest_lng - origin_lng)
@@ -18,7 +24,7 @@ def _haversine_km(origin_lat, origin_lng, dest_lat, dest_lng):
     return radius * c
 
 
-def estimate_travel_minutes(origin, destination):
+def estimate_travel_minutes(origin: Location, destination: Location) -> float:
     distance_km = _haversine_km(
         origin["lat"],
         origin["lng"],

@@ -1,5 +1,10 @@
+from __future__ import annotations
+
+from datetime import datetime
+from typing import Any
+
 from dateutil.parser import isoparse
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, Response, jsonify, request
 
 from app.extensions import db
 from app.models.event import SalesEvent
@@ -9,18 +14,18 @@ bp = Blueprint("events", __name__, url_prefix="/api/events")
 
 
 @bp.get("")
-def list_events():
-    sales_rep_id = request.args.get("sales_rep_id")
-    start = request.args.get("start")
-    end = request.args.get("end")
+def list_events() -> tuple[Response, int] | Response:
+    sales_rep_id: str | None = request.args.get("sales_rep_id")
+    start: str | None = request.args.get("start")
+    end: str | None = request.args.get("end")
 
     if not sales_rep_id or not start or not end:
         return jsonify({"error": "sales_rep_id, start and end are required"}), 400
 
-    start_at = to_naive_utc(isoparse(start))
-    end_at = to_naive_utc(isoparse(end))
+    start_at: datetime = to_naive_utc(isoparse(start))
+    end_at: datetime = to_naive_utc(isoparse(end))
 
-    events = (
+    events: list[SalesEvent] = (
         SalesEvent.query.filter_by(sales_rep_id=sales_rep_id)
         .filter(SalesEvent.start_at >= start_at)
         .filter(SalesEvent.end_at <= end_at)
@@ -32,10 +37,13 @@ def list_events():
 
 
 @bp.post("")
-def create_event():
-    payload = request.get_json(force=True)
+def create_event() -> tuple[Response, int] | Response:
+    payload_raw: Any = request.get_json(force=True)
+    if not isinstance(payload_raw, dict):
+        return jsonify({"error": "invalid JSON payload"}), 400
+    payload: dict[str, Any] = payload_raw
 
-    required = [
+    required: list[str] = [
         "title",
         "address",
         "start_at",
@@ -44,24 +52,24 @@ def create_event():
         "lng",
         "sales_rep_id",
     ]
-    missing = [key for key in required if key not in payload]
+    missing: list[str] = [key for key in required if key not in payload]
     if missing:
         return jsonify({"error": f"missing fields: {', '.join(missing)}"}), 400
 
-    start_at = to_naive_utc(isoparse(payload["start_at"]))
-    end_at = to_naive_utc(isoparse(payload["end_at"]))
+    start_at: datetime = to_naive_utc(isoparse(str(payload["start_at"])))
+    end_at: datetime = to_naive_utc(isoparse(str(payload["end_at"])))
     if end_at <= start_at:
         return jsonify({"error": "end_at must be after start_at"}), 400
 
-    event = SalesEvent(
-        title=payload["title"],
-        address=payload["address"],
+    event: SalesEvent = SalesEvent(
+        title=str(payload["title"]),
+        address=str(payload["address"]),
         start_at=start_at,
         end_at=end_at,
         lat=float(payload["lat"]),
         lng=float(payload["lng"]),
-        sales_rep_id=payload["sales_rep_id"],
-        time_zone=payload.get("time_zone"),
+        sales_rep_id=str(payload["sales_rep_id"]),
+        time_zone=str(payload.get("time_zone")) if payload.get("time_zone") is not None else None,
     )
     db.session.add(event)
     db.session.commit()
