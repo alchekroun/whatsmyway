@@ -11,7 +11,25 @@ from app.routes.events import bp as events_bp
 from app.routes.recommendations import bp as recommendations_bp
 
 
+def _load_env_file() -> None:
+    env_path: str = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".env"))
+    if not os.path.exists(env_path):
+        return
+
+    with open(env_path, "r", encoding="utf-8") as env_file:
+        for raw_line in env_file:
+            line: str = raw_line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            key, value = line.split("=", 1)
+            key = key.strip()
+            value = value.strip()
+            if key and key not in os.environ:
+                os.environ[key] = value
+
+
 def create_app() -> Flask:
+    _load_env_file()
     app: Flask = Flask(__name__)
 
     database_url: str = os.getenv("DATABASE_URL", "sqlite:///whatsmyway.db")

@@ -63,8 +63,6 @@ Frontend default runs on `http://localhost:5173`, API on `http://localhost:5001`
   "address": "123 Main St",
   "start_at": "2026-02-25T09:00:00-05:00",
   "end_at": "2026-02-25T10:00:00-05:00",
-  "lat": 40.7128,
-  "lng": -74.006,
   "sales_rep_id": "rep-001",
   "time_zone": "America/New_York"
 }
@@ -79,8 +77,6 @@ Frontend default runs on `http://localhost:5173`, API on `http://localhost:5001`
   "sales_rep_id": "rep-001",
   "new_event_duration_min": 45,
   "new_event_address": "789 Park Ave",
-  "new_event_lat": 40.73061,
-  "new_event_lng": -73.935242,
   "buffer_min": 10
 }
 ```
@@ -96,7 +92,7 @@ Returns ranked candidate slots sorted by minimal added travel time.
 4. Apply duration + buffer constraints.
 5. Rank by lowest added travel, then earliest start.
 
-Current travel-time model is deterministic Haversine + speed heuristic.
+Travel-time and geocoding are provider-backed via a modular location interface (Geoapify by default).
 
 ## Vercel Deployment (Monorepo)
 

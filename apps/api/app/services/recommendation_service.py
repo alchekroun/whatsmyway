@@ -4,8 +4,8 @@ from datetime import datetime, timedelta
 from typing import Sequence, TypedDict
 
 from app.models.event import SalesEvent
+from app.services.location_service import GeoPoint, LocationService
 from app.services.time_service import to_naive_utc
-from app.services.travel_service import Location, estimate_travel_minutes
 
 DAY_START_HOUR: int = 8
 DAY_END_HOUR: int = 19
@@ -15,22 +15,19 @@ MAX_SUGGESTIONS: int = 10
 class RecommendationResult(TypedDict):
     start_at: str
     end_at: str
+    new_event_address: str
     before_event_id: str | None
     after_event_id: str | None
     added_travel_min: float
     total_travel_min: float
+    travel_from_previous_min: float | None
+    travel_to_next_min: float | None
     explanation: str
 
 
 class CandidateWindow(TypedDict):
     start: datetime
     end: datetime
-
-
-class NewEventLocation(TypedDict):
-    address: str
-    lat: float
-    lng: float
 
 
 def _build_candidate_windows(
@@ -84,13 +81,19 @@ def _neighbors_for_slot(
     return previous_event, next_event
 
 
+def _point_from_event(event: SalesEvent) -> GeoPoint:
+    return GeoPoint(lat=float(event.lat), lng=float(event.lng))
+
+
 def recommend_slots(
     date_start: datetime,
     date_end: datetime,
     events: Sequence[SalesEvent],
-    new_event: NewEventLocation,
+    new_event_point: GeoPoint,
+    new_event_address: str,
     duration_minutes: int,
     buffer_minutes: int,
+    location_service: LocationService,
 ) -> list[RecommendationResult]:
     duration: timedelta = timedelta(minutes=duration_minutes)
     buffer: timedelta = timedelta(minutes=buffer_minutes)
@@ -108,26 +111,27 @@ def recommend_slots(
 
         previous_event, next_event = _neighbors_for_slot(events, candidate_start, candidate_end)
 
-        prev_to_new: float = 0.0
-        new_to_next: float = 0.0
+        prev_to_new: float | None = None
+        new_to_next: float | None = None
         prev_to_next: float = 0.0
-        new_location: Location = {"lat": new_event["lat"], "lng": new_event["lng"]}
 
         if previous_event is not None:
-            previous_location: Location = {"lat": previous_event.lat, "lng": previous_event.lng}
-            prev_to_new = estimate_travel_minutes(previous_location, new_location)
+            previous_point: GeoPoint = _point_from_event(previous_event)
+            prev_to_new = location_service.estimate_travel_minutes(previous_point, new_event_point)
 
         if next_event is not None:
-            next_location: Location = {"lat": next_event.lat, "lng": next_event.lng}
-            new_to_next = estimate_travel_minutes(new_location, next_location)
+            next_point: GeoPoint = _point_from_event(next_event)
+            new_to_next = location_service.estimate_travel_minutes(new_event_point, next_point)
 
         if previous_event is not None and next_event is not None:
-            previous_location = {"lat": previous_event.lat, "lng": previous_event.lng}
-            next_location = {"lat": next_event.lat, "lng": next_event.lng}
-            prev_to_next = estimate_travel_minutes(previous_location, next_location)
+            previous_point = _point_from_event(previous_event)
+            next_point = _point_from_event(next_event)
+            prev_to_next = location_service.estimate_travel_minutes(previous_point, next_point)
 
-        added_travel: float = round(max(prev_to_new + new_to_next - prev_to_next, 0.0), 1)
-        total_travel: float = round(prev_to_new + new_to_next, 1)
+        prev_to_new_value: float = prev_to_new if prev_to_new is not None else 0.0
+        new_to_next_value: float = new_to_next if new_to_next is not None else 0.0
+        added_travel: float = round(max(prev_to_new_value + new_to_next_value - prev_to_next, 0.0), 1)
+        total_travel: float = round(prev_to_new_value + new_to_next_value, 1)
         before_event_id: str | None = previous_event.id if previous_event is not None else None
         after_event_id: str | None = next_event.id if next_event is not None else None
 
@@ -140,10 +144,13 @@ def recommend_slots(
             {
                 "start_at": candidate_start.isoformat(),
                 "end_at": candidate_end.isoformat(),
+                "new_event_address": new_event_address,
                 "before_event_id": before_event_id,
                 "after_event_id": after_event_id,
                 "added_travel_min": added_travel,
                 "total_travel_min": total_travel,
+                "travel_from_previous_min": prev_to_new,
+                "travel_to_next_min": new_to_next,
                 "explanation": explanation,
             }
         )

@@ -1,22 +1,40 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type {
   EventInput,
   Recommendation,
   RecommendationRequest,
   SalesEvent
 } from "@whatsmyway/shared-types";
-import { createEvent, listEvents, recommend } from "./services/apiClient";
+import { createEvent, deleteEvent, listEvents, recommend } from "./services/apiClient";
 
-function nowLocalDateTime(): string {
-  const now = new Date();
-  now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
-  return now.toISOString().slice(0, 16);
+type EventDraft = {
+  title: string;
+  address: string;
+  start_at: string;
+  duration_min: number;
+  time_zone?: string;
+};
+
+function toLocalInputValue(date: Date): string {
+  const adjusted = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
+  return adjusted.toISOString().slice(0, 16);
 }
 
-function minutesFromNow(minutes: number): string {
+function startOfTodayInput(): string {
   const now = new Date();
-  now.setMinutes(now.getMinutes() + minutes - now.getTimezoneOffset());
-  return now.toISOString().slice(0, 16);
+  now.setHours(0, 0, 0, 0);
+  return toLocalInputValue(now);
+}
+
+function daysFromNowInput(days: number): string {
+  const now = new Date();
+  now.setDate(now.getDate() + days);
+  now.setHours(23, 59, 0, 0);
+  return toLocalInputValue(now);
+}
+
+function nowLocalDateTime(): string {
+  return toLocalInputValue(new Date());
 }
 
 function startOfDay(date: Date): Date {
@@ -51,22 +69,33 @@ function formatTimeWindow(startAt: string, endAt: string): string {
   return `${start.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })} - ${end.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`;
 }
 
+function computeEndFromStart(startAt: string, durationMin: number): string {
+  const start = new Date(startAt);
+  start.setMinutes(start.getMinutes() + durationMin);
+  return toLocalInputValue(start);
+}
+
+function isValidDateInput(value: string): boolean {
+  return !Number.isNaN(new Date(value).getTime());
+}
+
+function recommendationKey(item: Recommendation): string {
+  return `${item.start_at}__${item.end_at}__${item.new_event_address}`;
+}
+
 export default function App() {
   const [salesRepId, setSalesRepId] = useState<string>("rep-001");
-  const [rangeStart, setRangeStart] = useState<string>(nowLocalDateTime());
-  const [rangeEnd, setRangeEnd] = useState<string>(minutesFromNow(60 * 24 * 5));
+  const [rangeStart, setRangeStart] = useState<string>(startOfTodayInput());
+  const [rangeEnd, setRangeEnd] = useState<string>(daysFromNowInput(7));
   const [events, setEvents] = useState<SalesEvent[]>([]);
   const [suggestions, setSuggestions] = useState<Recommendation[]>([]);
   const [error, setError] = useState<string | null>(null);
 
-  const [eventForm, setEventForm] = useState<EventInput>({
+  const [eventForm, setEventForm] = useState<EventDraft>({
     title: "",
     address: "",
     start_at: nowLocalDateTime(),
-    end_at: minutesFromNow(60),
-    lat: 40.7128,
-    lng: -74.006,
-    sales_rep_id: salesRepId,
+    duration_min: 60,
     time_zone: Intl.DateTimeFormat().resolvedOptions().timeZone
   });
 
@@ -76,8 +105,6 @@ export default function App() {
     sales_rep_id: salesRepId,
     new_event_duration_min: 45,
     new_event_address: "",
-    new_event_lat: 40.73061,
-    new_event_lng: -73.935242,
     buffer_min: 10
   });
 
@@ -98,7 +125,63 @@ export default function App() {
     });
   }, [calendarDays, sortedEvents]);
 
+  const projectedEnd = useMemo(() => {
+    if (!isValidDateInput(eventForm.start_at) || eventForm.duration_min <= 0) {
+      return "";
+    }
+    return computeEndFromStart(eventForm.start_at, eventForm.duration_min);
+  }, [eventForm.start_at, eventForm.duration_min]);
+
+  function validateRangeInputs(): string | null {
+    if (!isValidDateInput(rangeStart) || !isValidDateInput(rangeEnd)) {
+      return "Date range values are invalid.";
+    }
+
+    if (new Date(rangeEnd) <= new Date(rangeStart)) {
+      return "Date range end must be after date range start.";
+    }
+
+    return null;
+  }
+
+  function validateEventForm(): string | null {
+    if (!eventForm.title.trim()) {
+      return "Event title is required.";
+    }
+    if (!eventForm.address.trim()) {
+      return "Event address is required.";
+    }
+    if (!isValidDateInput(eventForm.start_at)) {
+      return "Event start datetime is invalid.";
+    }
+    if (!Number.isFinite(eventForm.duration_min) || eventForm.duration_min <= 0) {
+      return "Event duration must be a positive number.";
+    }
+
+    return null;
+  }
+
+  function validateRecommendationForm(): string | null {
+    if (!recommendForm.new_event_address.trim()) {
+      return "Recommendation event address is required.";
+    }
+    if (!Number.isFinite(recommendForm.new_event_duration_min) || recommendForm.new_event_duration_min <= 0) {
+      return "Recommendation duration must be positive.";
+    }
+    if (!Number.isFinite(recommendForm.buffer_min ?? 0) || (recommendForm.buffer_min ?? 0) < 0) {
+      return "Buffer must be zero or a positive number.";
+    }
+
+    return null;
+  }
+
   async function loadEvents(): Promise<void> {
+    const rangeError = validateRangeInputs();
+    if (rangeError) {
+      setError(rangeError);
+      return;
+    }
+
     setError(null);
     try {
       const data = await listEvents({
@@ -113,9 +196,29 @@ export default function App() {
   }
 
   async function submitEvent(): Promise<void> {
+    const rangeError = validateRangeInputs();
+    if (rangeError) {
+      setError(rangeError);
+      return;
+    }
+
+    const formError = validateEventForm();
+    if (formError) {
+      setError(formError);
+      return;
+    }
+
     setError(null);
     try {
-      const payload = { ...eventForm, sales_rep_id: salesRepId };
+      const endAt = computeEndFromStart(eventForm.start_at, eventForm.duration_min);
+      const payload: EventInput = {
+        title: eventForm.title.trim(),
+        address: eventForm.address.trim(),
+        start_at: eventForm.start_at,
+        end_at: endAt,
+        sales_rep_id: salesRepId,
+        time_zone: eventForm.time_zone
+      };
       await createEvent(payload);
       await loadEvents();
     } catch (err) {
@@ -123,11 +226,70 @@ export default function App() {
     }
   }
 
-  async function submitRecommendation(): Promise<void> {
+  async function handleDeleteEvent(eventId: string): Promise<void> {
     setError(null);
     try {
-      const payload = {
+      await deleteEvent(eventId);
+      await loadEvents();
+    } catch (err) {
+      setError((err as Error).message);
+    }
+  }
+
+  function dismissRecommendation(item: Recommendation): void {
+    const key = recommendationKey(item);
+    setSuggestions((prev) => prev.filter((candidate) => recommendationKey(candidate) !== key));
+  }
+
+  async function addRecommendationAsEvent(item: Recommendation): Promise<void> {
+    const suggestedTitle = `Visit - ${item.new_event_address}`;
+    const enteredTitle = window.prompt("Event name", suggestedTitle);
+    if (!enteredTitle) {
+      return;
+    }
+
+    const title = enteredTitle.trim();
+    if (!title) {
+      setError("Event name cannot be empty.");
+      return;
+    }
+
+    setError(null);
+    try {
+      const payload: EventInput = {
+        title,
+        address: item.new_event_address,
+        start_at: item.start_at,
+        end_at: item.end_at,
+        sales_rep_id: salesRepId,
+        time_zone: Intl.DateTimeFormat().resolvedOptions().timeZone
+      };
+      await createEvent(payload);
+      dismissRecommendation(item);
+      await loadEvents();
+    } catch (err) {
+      setError((err as Error).message);
+    }
+  }
+
+  async function submitRecommendation(): Promise<void> {
+    const rangeError = validateRangeInputs();
+    if (rangeError) {
+      setError(rangeError);
+      return;
+    }
+
+    const formError = validateRecommendationForm();
+    if (formError) {
+      setError(formError);
+      return;
+    }
+
+    setError(null);
+    try {
+      const payload: RecommendationRequest = {
         ...recommendForm,
+        new_event_address: recommendForm.new_event_address.trim(),
         sales_rep_id: salesRepId,
         date_start: rangeStart,
         date_end: rangeEnd
@@ -139,6 +301,10 @@ export default function App() {
     }
   }
 
+  useEffect(() => {
+    void loadEvents();
+  }, []);
+
   return (
     <main className="app-shell">
       <h1>WhatsMyWay</h1>
@@ -148,53 +314,45 @@ export default function App() {
         <aside className="panel side-panel">
           <h2>Create Event</h2>
           <label>
-            Title
+            Title *
             <input
+              required
               value={eventForm.title}
               onChange={(e) => setEventForm({ ...eventForm, title: e.target.value })}
             />
           </label>
           <label>
-            Address
+            Address *
             <input
+              required
               value={eventForm.address}
               onChange={(e) => setEventForm({ ...eventForm, address: e.target.value })}
             />
           </label>
           <div className="inline">
             <label>
-              Start
+              Start *
               <input
+                required
                 type="datetime-local"
                 value={eventForm.start_at}
                 onChange={(e) => setEventForm({ ...eventForm, start_at: e.target.value })}
               />
             </label>
             <label>
-              End
+              Duration (min) *
               <input
-                type="datetime-local"
-                value={eventForm.end_at}
-                onChange={(e) => setEventForm({ ...eventForm, end_at: e.target.value })}
-              />
-            </label>
-            <label>
-              Latitude
-              <input
+                required
+                min={1}
                 type="number"
-                value={eventForm.lat}
-                onChange={(e) => setEventForm({ ...eventForm, lat: Number(e.target.value) })}
-              />
-            </label>
-            <label>
-              Longitude
-              <input
-                type="number"
-                value={eventForm.lng}
-                onChange={(e) => setEventForm({ ...eventForm, lng: Number(e.target.value) })}
+                value={eventForm.duration_min}
+                onChange={(e) =>
+                  setEventForm({ ...eventForm, duration_min: Number(e.target.value) })
+                }
               />
             </label>
           </div>
+          <p className="hint">Ends at: {projectedEnd ? new Date(projectedEnd).toLocaleString() : "-"}</p>
           <button onClick={submitEvent}>Save event</button>
         </aside>
 
@@ -202,20 +360,22 @@ export default function App() {
           <div className="panel controls-panel">
             <div className="controls-row">
               <label>
-                Sales rep id
-                <input value={salesRepId} onChange={(e) => setSalesRepId(e.target.value)} />
+                Sales rep id *
+                <input required value={salesRepId} onChange={(e) => setSalesRepId(e.target.value)} />
               </label>
               <label>
-                Date range start
+                Date range start *
                 <input
+                  required
                   type="datetime-local"
                   value={rangeStart}
                   onChange={(e) => setRangeStart(e.target.value)}
                 />
               </label>
               <label>
-                Date range end
+                Date range end *
                 <input
+                  required
                   type="datetime-local"
                   value={rangeEnd}
                   onChange={(e) => setRangeEnd(e.target.value)}
@@ -242,6 +402,15 @@ export default function App() {
                     ) : (
                       entry.events.map((event) => (
                         <div key={event.id} className="event-chip">
+                          <button
+                            className="event-delete"
+                            aria-label={`Delete ${event.title}`}
+                            onClick={() => {
+                              void handleDeleteEvent(event.id);
+                            }}
+                          >
+                            ×
+                          </button>
                           <strong>{event.title || "Untitled"}</strong>
                           <span>{formatTimeWindow(event.start_at, event.end_at)}</span>
                           <span>{event.address}</span>
@@ -258,16 +427,19 @@ export default function App() {
         <aside className="panel side-panel">
           <h2>Best Slot Recommendation</h2>
           <label>
-            New event address
+            New event address *
             <input
+              required
               value={recommendForm.new_event_address}
               onChange={(e) => setRecommendForm({ ...recommendForm, new_event_address: e.target.value })}
             />
           </label>
           <div className="inline">
             <label>
-              Duration (min)
+              Duration (min) *
               <input
+                required
+                min={1}
                 type="number"
                 value={recommendForm.new_event_duration_min}
                 onChange={(e) =>
@@ -279,38 +451,38 @@ export default function App() {
               />
             </label>
             <label>
-              Buffer (min)
+              Buffer (min) *
               <input
+                required
+                min={0}
                 type="number"
                 value={recommendForm.buffer_min}
                 onChange={(e) => setRecommendForm({ ...recommendForm, buffer_min: Number(e.target.value) })}
-              />
-            </label>
-            <label>
-              Latitude
-              <input
-                type="number"
-                value={recommendForm.new_event_lat}
-                onChange={(e) => setRecommendForm({ ...recommendForm, new_event_lat: Number(e.target.value) })}
-              />
-            </label>
-            <label>
-              Longitude
-              <input
-                type="number"
-                value={recommendForm.new_event_lng}
-                onChange={(e) => setRecommendForm({ ...recommendForm, new_event_lng: Number(e.target.value) })}
               />
             </label>
           </div>
           <button onClick={submitRecommendation}>Get recommendations</button>
           <ul>
             {suggestions.map((slot) => (
-              <li key={`${slot.start_at}-${slot.end_at}`}>
+              <li key={recommendationKey(slot)} className="recommendation-item">
                 <strong>{formatTimeWindow(slot.start_at, slot.end_at)}</strong>
                 <div>{new Date(slot.start_at).toLocaleDateString()}</div>
-                <div>Added travel: {slot.added_travel_min} min</div>
-                <div>{slot.explanation}</div>
+                <div>
+                  Travel from previous event:{" "}
+                  {slot.travel_from_previous_min === null ? "N/A" : `${slot.travel_from_previous_min} min`}
+                </div>
+                <div>
+                  Travel to next event:{" "}
+                  {slot.travel_to_next_min === null ? "N/A" : `${slot.travel_to_next_min} min`}
+                </div>
+                <div className="recommendation-actions">
+                  <button type="button" onClick={() => dismissRecommendation(slot)}>
+                    Dismiss
+                  </button>
+                  <button type="button" onClick={() => void addRecommendationAsEvent(slot)}>
+                    Add as event
+                  </button>
+                </div>
               </li>
             ))}
           </ul>

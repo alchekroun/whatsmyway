@@ -101,13 +101,34 @@ h1 {
 }
 
 .event-chip {
+  position: relative;
   display: grid;
   gap: 3px;
   border-radius: 10px;
   border: 1px solid #b6d6f0;
   background: linear-gradient(180deg, #e8f4ff 0%, #f3f9ff 100%);
   padding: 8px;
+  padding-right: 26px;
   font-size: 0.84rem;
+}
+
+.event-delete {
+  position: absolute;
+  top: 4px;
+  right: 5px;
+  width: 18px;
+  height: 18px;
+  border: 0;
+  border-radius: 9px;
+  background: #d14b4b;
+  color: #ffffff;
+  padding: 0;
+  line-height: 1;
+  font-size: 14px;
+}
+
+.event-delete:hover {
+  background: #ba3232;
 }
 
 .empty-day {
@@ -162,6 +183,23 @@ li {
 
 li:first-child {
   border-top: 0;
+}
+
+.recommendation-item {
+  display: grid;
+  gap: 4px;
+}
+
+.recommendation-actions {
+  margin-top: 6px;
+  display: flex;
+  gap: 8px;
+}
+
+.recommendation-actions button {
+  width: auto;
+  margin-top: 0;
+  padding: 6px 10px;
 }
 
 .error {
