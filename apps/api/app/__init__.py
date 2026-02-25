@@ -1,6 +1,9 @@
-import os
+from __future__ import annotations
 
-from flask import Flask, jsonify
+import os
+from typing import Any
+
+from flask import Flask, Response, jsonify
 from flask_cors import CORS
 
 from app.extensions import db
@@ -8,10 +11,10 @@ from app.routes.events import bp as events_bp
 from app.routes.recommendations import bp as recommendations_bp
 
 
-def create_app():
-    app = Flask(__name__)
+def create_app() -> Flask:
+    app: Flask = Flask(__name__)
 
-    database_url = os.getenv("DATABASE_URL", "sqlite:///whatsmyway.db")
+    database_url: str = os.getenv("DATABASE_URL", "sqlite:///whatsmyway.db")
     if database_url.startswith("postgres://"):
         database_url = database_url.replace("postgres://", "postgresql+psycopg://", 1)
     elif database_url.startswith("postgresql://"):
@@ -27,8 +30,9 @@ def create_app():
         db.create_all()
 
     @app.get("/api/health")
-    def healthcheck():
-        return jsonify({"status": "ok"})
+    def healthcheck() -> Response:
+        payload: dict[str, Any] = {"status": "ok"}
+        return jsonify(payload)
 
     app.register_blueprint(events_bp)
     app.register_blueprint(recommendations_bp)

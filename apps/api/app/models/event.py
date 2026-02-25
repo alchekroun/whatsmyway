@@ -1,6 +1,8 @@
 import uuid
+from datetime import datetime
+from typing import Any, cast
 
-from sqlalchemy import String, Float
+from sqlalchemy import Float, String
 
 from app.extensions import db
 
@@ -13,19 +15,21 @@ class SalesEvent(db.Model):
     address = db.Column(String(500), nullable=False)
     start_at = db.Column(db.DateTime(timezone=True), nullable=False)
     end_at = db.Column(db.DateTime(timezone=True), nullable=False)
-    # Coordinates are internal implementation details resolved from address geocoding.
     lat = db.Column(Float, nullable=False)
     lng = db.Column(Float, nullable=False)
     sales_rep_id = db.Column(String(128), nullable=False, index=True)
     time_zone = db.Column(String(128), nullable=True)
 
-    def to_dict(self):
-        return {
+    def to_dict(self) -> dict[str, Any]:
+        payload: dict[str, Any] = {
             "id": self.id,
             "title": self.title,
             "address": self.address,
-            "start_at": self.start_at.isoformat(),
-            "end_at": self.end_at.isoformat(),
+            "start_at": cast(datetime, self.start_at).isoformat(),
+            "end_at": cast(datetime, self.end_at).isoformat(),
+            "lat": self.lat,
+            "lng": self.lng,
             "sales_rep_id": self.sales_rep_id,
             "time_zone": self.time_zone,
         }
+        return payload
