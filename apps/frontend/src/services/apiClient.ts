@@ -27,13 +27,19 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     throw new Error(parsedError || text || `Request failed with ${response.status}`);
   }
 
-  return response.json() as Promise<T>;
+  return response.status === 204 ? (undefined as T) : (response.json() as Promise<T>);
 }
 
 export function createEvent(payload: EventInput): Promise<SalesEvent> {
   return request<SalesEvent>("/api/events", {
     method: "POST",
     body: JSON.stringify(payload)
+  });
+}
+
+export function deleteEvent(eventId: string): Promise<void> {
+  return request<void>(`/api/events/${eventId}`, {
+    method: "DELETE"
   });
 }
 

@@ -27,8 +27,6 @@ class SalesEvent(db.Model):
             "address": self.address,
             "start_at": cast(datetime, self.start_at).isoformat(),
             "end_at": cast(datetime, self.end_at).isoformat(),
-            "lat": self.lat,
-            "lng": self.lng,
             "sales_rep_id": self.sales_rep_id,
             "time_zone": self.time_zone,
         }
