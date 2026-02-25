@@ -63,3 +63,15 @@ export function recommend(payload: RecommendationRequest): Promise<Recommendatio
     body: JSON.stringify(payload)
   });
 }
+
+export function suggestAddresses(query: string): Promise<{ suggestions: string[] }> {
+  const params = new URLSearchParams({ q: query });
+  return request<{ suggestions: string[] }>(`/api/addresses/suggest?${params.toString()}`);
+}
+
+export function validateAddress(address: string): Promise<{ valid: boolean; normalized_address: string }> {
+  return request<{ valid: boolean; normalized_address: string }>("/api/addresses/validate", {
+    method: "POST",
+    body: JSON.stringify({ address })
+  });
+}

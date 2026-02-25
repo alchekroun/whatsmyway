@@ -170,6 +170,41 @@ button:hover {
   gap: 10px;
 }
 
+.address-suggestions {
+  margin-top: 6px;
+  border: 1px solid #d6e2ec;
+  border-radius: 8px;
+  background: #ffffff;
+  max-height: 140px;
+  overflow: auto;
+}
+
+.address-suggestion {
+  width: 100%;
+  border: 0;
+  border-bottom: 1px solid #edf2f6;
+  border-radius: 0;
+  background: #ffffff;
+  color: #1e2f3c;
+  text-align: left;
+  padding: 8px 10px;
+  margin-top: 0;
+}
+
+.address-suggestion:last-child {
+  border-bottom: 0;
+}
+
+.address-suggestion:hover {
+  background: #f2f8ff;
+}
+
+.address-status {
+  margin-top: 6px;
+  font-size: 0.82rem;
+  color: #4f6274;
+}
+
 ul {
   margin: 8px 0 0;
   padding: 0;

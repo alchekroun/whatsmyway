@@ -7,6 +7,7 @@ from flask import Flask, Response, jsonify
 from flask_cors import CORS
 
 from app.extensions import db
+from app.routes.addresses import bp as addresses_bp
 from app.routes.events import bp as events_bp
 from app.routes.recommendations import bp as recommendations_bp
 
@@ -54,5 +55,6 @@ def create_app() -> Flask:
 
     app.register_blueprint(events_bp)
     app.register_blueprint(recommendations_bp)
+    app.register_blueprint(addresses_bp)
 
     return app

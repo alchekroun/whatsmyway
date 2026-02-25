@@ -38,6 +38,7 @@ class GeoPoint:
 
 class GeocodingProvider(Protocol):
     def geocode(self, address: str) -> GeoPoint: ...
+    def suggest_addresses(self, query: str, limit: int = 5) -> list[str]: ...
 
 
 class RoutingProvider(Protocol):
@@ -92,6 +93,24 @@ class GeoapifyProvider:
             raise GeocodingError(f"Invalid geocoding response for address '{address}'")
 
         return GeoPoint(lat=float(lat), lng=float(lng))
+
+    def suggest_addresses(self, query: str, limit: int = 5) -> list[str]:
+        try:
+            payload: dict[str, Any] = self._get_json(
+                "https://api.geoapify.com/v1/geocode/autocomplete",
+                {"text": query, "limit": str(limit)},
+            )
+        except RuntimeError as exc:
+            raise GeocodingError(f"Failed to fetch address suggestions for '{query}': {exc}") from exc
+
+        features: list[dict[str, Any]] = payload.get("features", [])
+        suggestions: list[str] = []
+        for feature in features:
+            properties: dict[str, Any] = feature.get("properties", {})
+            formatted: Any = properties.get("formatted")
+            if isinstance(formatted, str) and formatted.strip():
+                suggestions.append(formatted.strip())
+        return suggestions
 
     def estimate_travel_minutes(self, origin: GeoPoint, destination: GeoPoint) -> float:
         waypoints: str = f"{origin.lat},{origin.lng}|{destination.lat},{destination.lng}"
@@ -164,6 +183,12 @@ class LocationService:
     def geocode_address(self, address: str) -> GeoPoint:
         normalized: str = self.normalize_address(address)
         return self._cached_geocode(normalized)
+
+    def suggest_addresses(self, query: str, limit: int = 5) -> list[str]:
+        normalized_query: str = self.normalize_address(query)
+        if len(normalized_query) < 3:
+            return []
+        return self.geocoding_provider.suggest_addresses(normalized_query, limit=limit)
 
     def estimate_travel_minutes(self, origin: GeoPoint, destination: GeoPoint) -> float:
         try:

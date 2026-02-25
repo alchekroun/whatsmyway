@@ -5,7 +5,14 @@ import type {
   RecommendationRequest,
   SalesEvent
 } from "@whatsmyway/shared-types";
-import { createEvent, deleteEvent, listEvents, recommend } from "./services/apiClient";
+import {
+  createEvent,
+  deleteEvent,
+  listEvents,
+  recommend,
+  suggestAddresses,
+  validateAddress
+} from "./services/apiClient";
 
 type EventDraft = {
   title: string;
@@ -108,6 +115,13 @@ export default function App() {
     buffer_min: 10
   });
 
+  const [eventAddressSuggestions, setEventAddressSuggestions] = useState<string[]>([]);
+  const [recommendAddressSuggestions, setRecommendAddressSuggestions] = useState<string[]>([]);
+  const [eventAddressValidated, setEventAddressValidated] = useState<boolean>(false);
+  const [recommendAddressValidated, setRecommendAddressValidated] = useState<boolean>(false);
+  const [eventAddressMessage, setEventAddressMessage] = useState<string | null>(null);
+  const [recommendAddressMessage, setRecommendAddressMessage] = useState<string | null>(null);
+
   const sortedEvents = useMemo(
     () => [...events].sort((a, b) => new Date(a.start_at).getTime() - new Date(b.start_at).getTime()),
     [events]
@@ -132,6 +146,48 @@ export default function App() {
     return computeEndFromStart(eventForm.start_at, eventForm.duration_min);
   }, [eventForm.start_at, eventForm.duration_min]);
 
+  async function validateEventAddressInput(address: string): Promise<boolean> {
+    if (!address.trim()) {
+      setEventAddressValidated(false);
+      setEventAddressMessage("Address is required.");
+      return false;
+    }
+
+    try {
+      const response = await validateAddress(address);
+      setEventForm((prev) => ({ ...prev, address: response.normalized_address }));
+      setEventAddressValidated(true);
+      setEventAddressMessage("Address validated.");
+      setEventAddressSuggestions([]);
+      return true;
+    } catch (err) {
+      setEventAddressValidated(false);
+      setEventAddressMessage((err as Error).message);
+      return false;
+    }
+  }
+
+  async function validateRecommendAddressInput(address: string): Promise<boolean> {
+    if (!address.trim()) {
+      setRecommendAddressValidated(false);
+      setRecommendAddressMessage("Address is required.");
+      return false;
+    }
+
+    try {
+      const response = await validateAddress(address);
+      setRecommendForm((prev) => ({ ...prev, new_event_address: response.normalized_address }));
+      setRecommendAddressValidated(true);
+      setRecommendAddressMessage("Address validated.");
+      setRecommendAddressSuggestions([]);
+      return true;
+    } catch (err) {
+      setRecommendAddressValidated(false);
+      setRecommendAddressMessage((err as Error).message);
+      return false;
+    }
+  }
+
   function validateRangeInputs(): string | null {
     if (!isValidDateInput(rangeStart) || !isValidDateInput(rangeEnd)) {
       return "Date range values are invalid.";
@@ -151,6 +207,9 @@ export default function App() {
     if (!eventForm.address.trim()) {
       return "Event address is required.";
     }
+    if (!eventAddressValidated) {
+      return "Event address must be validated from provider.";
+    }
     if (!isValidDateInput(eventForm.start_at)) {
       return "Event start datetime is invalid.";
     }
@@ -164,6 +223,9 @@ export default function App() {
   function validateRecommendationForm(): string | null {
     if (!recommendForm.new_event_address.trim()) {
       return "Recommendation event address is required.";
+    }
+    if (!recommendAddressValidated) {
+      return "Recommendation address must be validated from provider.";
     }
     if (!Number.isFinite(recommendForm.new_event_duration_min) || recommendForm.new_event_duration_min <= 0) {
       return "Recommendation duration must be positive.";
@@ -302,6 +364,42 @@ export default function App() {
   }
 
   useEffect(() => {
+    if (eventForm.address.trim().length < 3) {
+      setEventAddressSuggestions([]);
+      return;
+    }
+
+    const timeout = setTimeout(async () => {
+      try {
+        const data = await suggestAddresses(eventForm.address.trim());
+        setEventAddressSuggestions(data.suggestions);
+      } catch {
+        setEventAddressSuggestions([]);
+      }
+    }, 250);
+
+    return () => clearTimeout(timeout);
+  }, [eventForm.address]);
+
+  useEffect(() => {
+    if (recommendForm.new_event_address.trim().length < 3) {
+      setRecommendAddressSuggestions([]);
+      return;
+    }
+
+    const timeout = setTimeout(async () => {
+      try {
+        const data = await suggestAddresses(recommendForm.new_event_address.trim());
+        setRecommendAddressSuggestions(data.suggestions);
+      } catch {
+        setRecommendAddressSuggestions([]);
+      }
+    }, 250);
+
+    return () => clearTimeout(timeout);
+  }, [recommendForm.new_event_address]);
+
+  useEffect(() => {
     void loadEvents();
   }, []);
 
@@ -326,8 +424,33 @@ export default function App() {
             <input
               required
               value={eventForm.address}
-              onChange={(e) => setEventForm({ ...eventForm, address: e.target.value })}
+              onChange={(e) => {
+                setEventForm({ ...eventForm, address: e.target.value });
+                setEventAddressValidated(false);
+                setEventAddressMessage(null);
+              }}
+              onBlur={() => {
+                void validateEventAddressInput(eventForm.address);
+              }}
             />
+            {eventAddressSuggestions.length > 0 ? (
+              <div className="address-suggestions">
+                {eventAddressSuggestions.map((candidate) => (
+                  <button
+                    key={candidate}
+                    type="button"
+                    className="address-suggestion"
+                    onClick={() => {
+                      setEventForm((prev) => ({ ...prev, address: candidate }));
+                      void validateEventAddressInput(candidate);
+                    }}
+                  >
+                    {candidate}
+                  </button>
+                ))}
+              </div>
+            ) : null}
+            {eventAddressMessage ? <div className="address-status">{eventAddressMessage}</div> : null}
           </label>
           <div className="inline">
             <label>
@@ -431,8 +554,35 @@ export default function App() {
             <input
               required
               value={recommendForm.new_event_address}
-              onChange={(e) => setRecommendForm({ ...recommendForm, new_event_address: e.target.value })}
+              onChange={(e) => {
+                setRecommendForm({ ...recommendForm, new_event_address: e.target.value });
+                setRecommendAddressValidated(false);
+                setRecommendAddressMessage(null);
+              }}
+              onBlur={() => {
+                void validateRecommendAddressInput(recommendForm.new_event_address);
+              }}
             />
+            {recommendAddressSuggestions.length > 0 ? (
+              <div className="address-suggestions">
+                {recommendAddressSuggestions.map((candidate) => (
+                  <button
+                    key={candidate}
+                    type="button"
+                    className="address-suggestion"
+                    onClick={() => {
+                      setRecommendForm((prev) => ({ ...prev, new_event_address: candidate }));
+                      void validateRecommendAddressInput(candidate);
+                    }}
+                  >
+                    {candidate}
+                  </button>
+                ))}
+              </div>
+            ) : null}
+            {recommendAddressMessage ? (
+              <div className="address-status">{recommendAddressMessage}</div>
+            ) : null}
           </label>
           <div className="inline">
             <label>
