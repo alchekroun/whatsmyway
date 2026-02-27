@@ -13,8 +13,7 @@ def test_recommendations_rejects_invalid_range(client):
         "date_end": "2026-03-10T11:00:00Z",
         "sales_rep_id": "rep-paris",
         "new_event_duration_min": 30,
-        "new_event_lat": 48.8566,
-        "new_event_lng": 2.3522,
+        "new_event_address": "Hôtel de Ville",
     }
     response = client.post("/api/recommendations", json=payload)
     assert response.status_code == 400

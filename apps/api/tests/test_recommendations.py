@@ -8,6 +8,7 @@ import pytest
 
 from app.extensions import db
 from app.models.event import SalesEvent
+from app.services.location_service import GeoPoint, LocationService
 from app.services.recommendation_service import recommend_slots
 from app.services.travel_service import estimate_travel_minutes
 
@@ -63,25 +64,37 @@ def _create_paris_schedule() -> list[SalesEvent]:
 
 def test_get_recommendations_extensive_paris_dataset_with_cached_real_routes(app, client, monkeypatch):
     route_lookup = _load_real_route_lookup()
+    address_to_point = {
+        item["name"]: GeoPoint(lat=float(item["lat"]), lng=float(item["lng"])) for item in ADDRESSES
+    }
 
-    def fake_travel_minutes(origin, destination):
-        key = (_coord_key(origin["lat"], origin["lng"]), _coord_key(destination["lat"], destination["lng"]))
-        return route_lookup.get(key, 2.0)
+    class FakeLocationService:
+        def geocode_address(self, address: str) -> GeoPoint:
+            point = address_to_point.get(address)
+            if point is None:
+                raise ValueError(f"Unknown test address: {address}")
+            return point
 
-    monkeypatch.setattr("app.services.recommendation_service.estimate_travel_minutes", fake_travel_minutes)
+        def estimate_travel_minutes(self, origin: GeoPoint, destination: GeoPoint) -> float:
+            key = (_coord_key(origin.lat, origin.lng), _coord_key(destination.lat, destination.lng))
+            value = route_lookup.get(key)
+            if value is None:
+                raise KeyError(f"Missing cached route for {key}")
+            return value
+
+    monkeypatch.setattr("app.routes.recommendations.get_location_service", lambda: FakeLocationService())
 
     with app.app_context():
         events = _create_paris_schedule()
+        event_ids = {event.id for event in events}
 
     payload = {
         "date_start": "2026-03-10T08:00:00+01:00",
         "date_end": "2026-03-10T19:00:00+01:00",
         "sales_rep_id": "rep-paris",
-        "new_event_duration_min": 25,
-        "new_event_address": "Hôtel de Ville",
-        "new_event_lat": 48.8566,
-        "new_event_lng": 2.3522,
-        "buffer_min": 5,
+        "new_event_duration_min": 10,
+        "new_event_address": ADDRESSES[0]["name"],
+        "buffer_min": 0,
     }
 
     response = client.post("/api/recommendations", json=payload)
@@ -94,11 +107,10 @@ def test_get_recommendations_extensive_paris_dataset_with_cached_real_routes(app
     for suggestion in suggestions:
         start = datetime.fromisoformat(suggestion["start_at"])
         end = datetime.fromisoformat(suggestion["end_at"])
-        assert (end - start).total_seconds() == 25 * 60
+        assert (end - start).total_seconds() == 10 * 60
         assert suggestion["total_travel_min"] >= suggestion["added_travel_min"]
         assert "Inserted between" in suggestion["explanation"]
 
-    event_ids = {event.id for event in events}
     linked_ids = {
         suggestion["before_event_id"]
         for suggestion in suggestions
@@ -137,13 +149,22 @@ def test_recommend_slots_computes_added_travel_delta(app):
             sales_rep_id="rep-x",
         )
 
+        class FakeLocationService:
+            def estimate_travel_minutes(self, origin: GeoPoint, destination: GeoPoint) -> float:
+                return estimate_travel_minutes(
+                    {"lat": origin.lat, "lng": origin.lng},
+                    {"lat": destination.lat, "lng": destination.lng},
+                )
+
         suggestions = recommend_slots(
             date_start=datetime(2026, 3, 11, 8, 0),
             date_end=datetime(2026, 3, 11, 19, 0),
             events=[previous_event, next_event],
-            new_event={"address": "Midpoint", "lat": 48.85837, "lng": 2.294481},
+            new_event_point=GeoPoint(lat=48.85837, lng=2.294481),
+            new_event_address="Midpoint",
             duration_minutes=30,
             buffer_minutes=10,
+            location_service=FakeLocationService(),
         )
 
     assert suggestions
